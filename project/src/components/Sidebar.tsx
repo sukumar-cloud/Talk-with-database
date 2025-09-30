@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Home, LayoutDashboard, History, Terminal, MessageSquare, FileText, Settings, Database, Apple} from 'lucide-react';
+import { Home, LayoutDashboard, History, Terminal, MessageSquare, FileText, Settings, Database, Apple, Network, Code2} from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 export default function Sidebar() {
@@ -25,10 +25,34 @@ export default function Sidebar() {
     { icon: Home, label: 'Home', path: '/' },
     { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
     { 
+      icon: Network, 
+      label: 'Schema Workbench', 
+      path: '/schema',
+      color: 'text-cyan-400'
+    },
+    { 
+      icon: Code2, 
+      label: 'SQL Workbench', 
+      path: '/sql-workbench',
+      color: 'text-emerald-400'
+    },
+    { 
       icon: Terminal, 
       label: 'SQL Query', 
       path: '/sql-query',
       color: 'text-green-400'
+    },
+    { 
+      icon: Database, 
+      label: 'MongoDB Schema', 
+      path: '/mongodb-schema',
+      color: 'text-teal-400'
+    },
+    { 
+      icon: Database, 
+      label: 'MongoDB Workbench', 
+      path: '/mongodb-workbench',
+      color: 'text-green-500'
     },
     { 
       icon: Apple, 

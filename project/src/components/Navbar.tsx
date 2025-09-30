@@ -1,4 +1,3 @@
-import { Sun, User } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Navbar() {
@@ -22,12 +21,7 @@ export default function Navbar() {
             
           </div>
           <div className="flex items-center space-x-4">
-            <button className="p-2 rounded-lg hover:bg-[#00ff00]/10 transition-all duration-300">
-              <Sun className="h-5 w-5 text-[#00ff00]" />
-            </button>
-            <button className="p-2 rounded-lg hover:bg-[#00ff00]/10 transition-all duration-300">
-              <User className="h-5 w-5 text-[#00ff00]" />
-            </button>
+            {/* Icons removed as requested */}
           </div>
         </div>
       </div>

@@ -8,10 +8,10 @@ router = APIRouter()
 class RankRequest(BaseModel):
     text: str
     candidates: List[str]
-    schema: Dict[str, Any] | None = None
+    db_schema: Dict[str, Any] | None = None
     db_type: str = "mysql"
 
 @router.post("/")
 def rank(req: RankRequest):
-    ranked = rank_candidates(req.text, req.candidates, req.schema or {}, req.db_type)
+    ranked = rank_candidates(req.text, req.candidates, req.db_schema or {}, req.db_type)
     return {"ranked": ranked}

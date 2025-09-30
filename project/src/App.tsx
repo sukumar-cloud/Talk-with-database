@@ -10,16 +10,19 @@ import Settings from './pages/Settings';
 import SqlQuery from './pages/SqlQuery';
 import ApiQuery from './pages/ApiQuery';
 import MongoDbQuery from './pages/MongoDbQuery';
+import SchemaWorkbench from './pages/SchemaWorkbench';
+import SqlWorkbench from './pages/SqlWorkbench';
+import MongoDBWorkbench from './pages/MongoDBWorkbench';
+import MongoDBSchemaWorkbench from './pages/MongoDBSchemaWorkbench';
 
-function App() {
+function AppContent() {
   return (
-    <Router>
-      <div className="min-h-screen bg-black text-white">
-        <Navbar />
-        <div className="flex">
-          <Sidebar />
-          <main className="flex-1 pl-64 transition-all duration-300">
-            <Routes>
+    <div className="min-h-screen bg-black text-white">
+      <Navbar />
+      <div className="flex">
+        <Sidebar />
+        <main className="flex-1 pl-64 transition-all duration-300">
+          <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/history" element={<History />} />
@@ -29,10 +32,21 @@ function App() {
               <Route path="/sql-query" element={<SqlQuery />} />
               <Route path="/api-query" element={<ApiQuery />} />
               <Route path="/mongodb-query" element={<MongoDbQuery />} />
-            </Routes>
-          </main>
-        </div>
+              <Route path="/schema" element={<SchemaWorkbench />} />
+              <Route path="/sql-workbench" element={<SqlWorkbench />} />
+              <Route path="/mongodb-workbench" element={<MongoDBWorkbench />} />
+              <Route path="/mongodb-schema" element={<MongoDBSchemaWorkbench />} />
+          </Routes>
+        </main>
       </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }

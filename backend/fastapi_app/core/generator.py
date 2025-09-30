@@ -5,7 +5,14 @@ from typing import List
 from .config import settings
 
 class BaseGenerator:
-    def generate(self, prompt: str, n: int = 5) -> List[str]:
+    def generate(
+        self,
+        prompt: str,
+        n: int = 5,
+        temperature: float = 0.2,
+        top_p: float = 0.95,
+        max_tokens: int = 400
+    ) -> List[str]:
         raise NotImplementedError
 
 class MixtralOpenRouterAdapter(BaseGenerator):
@@ -17,20 +24,27 @@ class MixtralOpenRouterAdapter(BaseGenerator):
         if not self.api_key:
             raise RuntimeError("OPENROUTER_API_KEY not set")
 
-    def generate(self, prompt: str, n: int = 5) -> List[str]:
+    def generate(
+        self,
+        prompt: str,
+        n: int = 5,
+        temperature: float = 0.2,
+        top_p: float = 0.95,
+        max_tokens: int = 400
+    ) -> List[str]:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
         }
         body = {
             "model": self.model,
-            "temperature": settings.TEMP,
-            "top_p": settings.TOP_P,
+            "temperature": temperature,
+            "top_p": top_p,
             "n": n,
             "messages": [
                 {"role": "system", "content": "You are a query generator. Output only the final query."},
                 {"role": "user", "content": prompt},
             ],
-            "max_tokens": 400,
+            "max_tokens": max_tokens,
         }
         r = requests.post(self.BASE_URL, headers=headers, json=body, timeout=60)
         r.raise_for_status()
@@ -53,21 +67,28 @@ class MistralAdapter(BaseGenerator):
         if not self.api_key:
             raise RuntimeError("MISTRAL_API_KEY not set")
 
-    def generate(self, prompt: str, n: int = 5) -> List[str]:
+    def generate(
+        self,
+        prompt: str,
+        n: int = 5,
+        temperature: float = 0.2,
+        top_p: float = 0.95,
+        max_tokens: int = 400
+    ) -> List[str]:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
         body = {
             "model": self.model,
-            "temperature": settings.TEMP,
-            "top_p": settings.TOP_P,
+            "temperature": temperature,
+            "top_p": top_p,
             "n": n,
             "messages": [
                 {"role": "system", "content": "You are a query generator. Output only the final query."},
                 {"role": "user", "content": prompt},
             ],
-            "max_tokens": 400,
+            "max_tokens": max_tokens,
         }
         r = requests.post(self.BASE_URL, headers=headers, json=body, timeout=60)
         r.raise_for_status()
@@ -87,9 +108,23 @@ class LocalFlanAdapter(BaseGenerator):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 
-    def generate(self, prompt: str, n: int = 5) -> List[str]:
+    def generate(
+        self,
+        prompt: str,
+        n: int = 5,
+        temperature: float = 0.2,
+        top_p: float = 0.95,
+        max_tokens: int = 400
+    ) -> List[str]:
         inputs = self.tokenizer([prompt] * n, return_tensors="pt", truncation=True)
-        outputs = self.model.generate(**inputs, max_new_tokens=256, num_beams=4, do_sample=False)
+        outputs = self.model.generate(
+            **inputs,
+            max_new_tokens=max_tokens,
+            num_beams=max(n, 4),
+            temperature=temperature,
+            top_p=top_p,
+            do_sample=temperature > 0
+        )
         texts = [self.tokenizer.decode(o, skip_special_tokens=True) for o in outputs]
         return texts
 

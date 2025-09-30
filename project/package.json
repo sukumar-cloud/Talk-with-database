@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
+    "@types/react-syntax-highlighter": "^15.5.13",
     "@vercel/node": "^5.1.15",
     "buffer": "^6.0.3",
     "events": "^3.3.0",
@@ -20,9 +21,10 @@
     "process": "^0.11.10",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-markdown": "^9.0.1",
+    "react-markdown": "^9.1.0",
     "react-router-dom": "^6.22.3",
-    "react-syntax-highlighter": "^15.5.0",
+    "react-syntax-highlighter": "^15.6.6",
+    "reactflow": "^11.11.4",
     "stream-browserify": "^3.0.0",
     "util": "^0.12.5"
   },

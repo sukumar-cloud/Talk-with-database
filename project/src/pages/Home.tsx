@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Database, Apple as Api } from 'lucide-react';
+import { Database, Apple as Api, Table2, Layout } from 'lucide-react';
 
 export default function Home() {
   const queryTypes = [
@@ -23,6 +23,27 @@ export default function Home() {
       description: 'Transform text into MongoDB queries',
       path: '/mongodb-query',
       color: 'from-blue-400 to-blue-600'
+    },
+    {
+      icon: Layout,
+      title: 'MongoDB Schema',
+      description: 'Explore MongoDB collections and relationships',
+      path: '/mongodb-schema',
+      color: 'from-teal-400 to-cyan-600'
+    },
+    {
+      icon: Table2,
+      title: 'SQL Schema',
+      description: 'View MySQL database tables and ER diagram',
+      path: '/schema',
+      color: 'from-indigo-400 to-purple-600'
+    },
+    {
+      icon: Database,
+      title: 'MongoDB Workbench',
+      description: 'Execute MongoDB queries directly',
+      path: '/mongodb-workbench',
+      color: 'from-green-500 to-emerald-700'
     }
   ];
 
@@ -33,7 +54,7 @@ export default function Home() {
       </h1> */}
       <p className="text-gray-400 mb-12 text-lg">Transform natural language into powerful database queries</p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {queryTypes.map(({ icon: Icon, title, description, path, color }) => (
           <Link
             key={path}
