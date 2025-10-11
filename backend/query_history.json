@@ -284,5 +284,82 @@
     "error_message": null,
     "execution_time_ms": 865.0,
     "created_at": "2025-09-30T18:32:22.492713"
+  },
+  {
+    "id": "27f22ead-b57c-4172-8651-ddd007b26f2d",
+    "query_text": "show all customer",
+    "generated_sql": "SELECT * FROM customers LIMIT 10;",
+    "query_type": "mysql",
+    "status": "success",
+    "result_count": 10,
+    "error_message": null,
+    "execution_time_ms": 6867.0,
+    "created_at": "2025-10-11T09:01:39.449746"
+  },
+  {
+    "id": "ab99d4a6-4062-48a6-95b0-6405c8ec68e4",
+    "query_text": "Direct SQL: SELECT * FROM customers;...",
+    "generated_sql": "SELECT * FROM customers;",
+    "query_type": "mysql",
+    "status": "success",
+    "result_count": 600,
+    "error_message": null,
+    "execution_time_ms": 4322.0,
+    "created_at": "2025-10-11T09:03:44.927447"
+  },
+  {
+    "id": "c1d620ab-25d8-4ac7-a320-0688a782637c",
+    "query_text": "show all customer",
+    "generated_sql": "SELECT * FROM customers LIMIT 10;",
+    "query_type": "mysql",
+    "status": "success",
+    "result_count": 10,
+    "error_message": null,
+    "execution_time_ms": 6115.0,
+    "created_at": "2025-10-11T09:04:13.586194"
+  },
+  {
+    "id": "920ee7b9-df33-4db6-b3bf-30b7ea888133",
+    "query_text": "Direct SQL: SELECT * FROM customers;...",
+    "generated_sql": "SELECT * FROM customers;",
+    "query_type": "mysql",
+    "status": "success",
+    "result_count": 600,
+    "error_message": null,
+    "execution_time_ms": 4218.0,
+    "created_at": "2025-10-11T09:04:28.518510"
+  },
+  {
+    "id": "ecaf1287-b4b3-4371-a8e1-5a019d7cf5b1",
+    "query_text": "find all active users\n",
+    "generated_sql": "db.users.find()",
+    "query_type": "mongodb",
+    "status": "success",
+    "result_count": 0,
+    "error_message": null,
+    "execution_time_ms": 5947.0,
+    "created_at": "2025-10-11T09:06:37.578186"
+  },
+  {
+    "id": "02f1ea00-7069-412b-874d-82220347ffe1",
+    "query_text": "promotions.find({ \"status\": \"active\" })",
+    "generated_sql": "promotions.find({ \"status\": \"active\" })",
+    "query_type": "mongodb",
+    "status": "success",
+    "result_count": 0,
+    "error_message": null,
+    "execution_time_ms": 5242.0,
+    "created_at": "2025-10-11T09:07:24.279723"
+  },
+  {
+    "id": "78f1ba25-e076-47f8-ad95-9ef05495db31",
+    "query_text": "promotions.find({ \"status\": \"active\" })",
+    "generated_sql": "promotions.find({ \"status\": \"active\" })",
+    "query_type": "mongodb",
+    "status": "success",
+    "result_count": 0,
+    "error_message": null,
+    "execution_time_ms": 4781.0,
+    "created_at": "2025-10-11T09:07:39.080609"
   }
 ]
