@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Database, Table, FileJson, AlertCircle, CheckCircle, Loader, RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
 import Editor from '@monaco-editor/react';
+import { useToast } from '../contexts/ToastContext';
+import DeerLoader from '../components/DeerLoader';
 
 interface Collection {
   name: string;
@@ -15,13 +17,21 @@ interface DatabaseInfo {
 }
 
 const MongoDBWorkbench: React.FC = () => {
+  const { show } = useToast();
   const [databases, setDatabases] = useState<DatabaseInfo[]>([]);
   const [selectedDatabase, setSelectedDatabase] = useState<string>('');
   const [selectedCollection, setSelectedCollection] = useState<string>('');
-  const [query, setQuery] = useState(() => {
-    // Load saved query from localStorage
-    return localStorage.getItem('mongoWorkbenchQuery') || '{}';
+  // Tabs for queries
+  const [tabs, setTabs] = useState<Array<{ id: string; title: string; query: string }>>(() => {
+    const saved = localStorage.getItem('mongoWorkbenchTabs');
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    return [{ id: 'tab-1', title: 'Query 1', query: localStorage.getItem('mongoWorkbenchQuery') || '{}' }];
   });
+  const [activeTabId, setActiveTabId] = useState<string>(() => (JSON.parse(localStorage.getItem('mongoWorkbenchActive') || 'null') || 'tab-1'));
+  const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
+  const query = activeTab?.query || '{}';
   const [operation, setOperation] = useState(() => {
     return localStorage.getItem('mongoWorkbenchOperation') || 'find';
   });
@@ -29,15 +39,26 @@ const MongoDBWorkbench: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [schemaLoading, setSchemaLoading] = useState<boolean>(false);
+  const [saveHistory, setSaveHistory] = useState<boolean>(true);
 
   useEffect(() => {
     loadSchema();
   }, []);
 
   // Save query to localStorage whenever it changes
+  const persistTabs = (next: typeof tabs, nextActive?: string) => {
+    localStorage.setItem('mongoWorkbenchTabs', JSON.stringify(next));
+    if (nextActive) localStorage.setItem('mongoWorkbenchActive', JSON.stringify(nextActive));
+  };
+
   const handleQueryChange = (value: string | undefined) => {
     const newQuery = value || '{}';
-    setQuery(newQuery);
+    setTabs((prev: Array<{ id: string; title: string; query: string }>) => {
+      const next = prev.map(t => t.id === activeTabId ? { ...t, query: newQuery } : t);
+      persistTabs(next);
+      return next;
+    });
     localStorage.setItem('mongoWorkbenchQuery', newQuery);
   };
 
@@ -48,6 +69,7 @@ const MongoDBWorkbench: React.FC = () => {
   };
 
   const loadSchema = async () => {
+    setSchemaLoading(true);
     try {
       const response = await fetch('http://localhost:8000/mongodb/inspect', {
         method: 'POST',
@@ -104,6 +126,8 @@ const MongoDBWorkbench: React.FC = () => {
       }
     } catch (err) {
       console.error('Schema load failed:', err);
+    } finally {
+      setSchemaLoading(false);
     }
   };
 
@@ -185,23 +209,26 @@ const MongoDBWorkbench: React.FC = () => {
       const executionTime = performance.now() - startTime;
       
       // Save to history
-      try {
-        const queryText = `${selectedCollection}.${operation}(${query})`;
-        await fetch('http://localhost:8000/history/save', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query_text: queryText,
-            generated_sql: queryText,
-            query_type: 'mongodb',
-            status: querySuccess ? 'success' : 'error',
-            result_count: resultCount,
-            error_message: errorMessage || null,
-            execution_time_ms: Math.round(executionTime)
-          })
-        });
-      } catch (historyError) {
-        console.error('Failed to save to history:', historyError);
+      if (saveHistory) {
+        try {
+          const queryText = `${selectedCollection}.${operation}(${query})`;
+          await fetch('http://localhost:8000/history/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query_text: queryText,
+              generated_sql: queryText,
+              query_type: 'mongodb',
+              status: querySuccess ? 'success' : 'error',
+              result_count: resultCount,
+              error_message: errorMessage || null,
+              execution_time_ms: Math.round(executionTime)
+            })
+          });
+          show('Saved to history', { type: 'success' });
+        } catch (historyError) {
+          console.error('Failed to save to history:', historyError);
+        }
       }
     }
   };
@@ -299,7 +326,7 @@ const MongoDBWorkbench: React.FC = () => {
                   : 'Select a collection'}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <select
                 value={operation}
                 onChange={(e) => handleOperationChange(e.target.value)}
@@ -311,12 +338,27 @@ const MongoDBWorkbench: React.FC = () => {
                 <option value="delete">Delete</option>
                 <option value="count">Count</option>
               </select>
+              <label className="text-xs text-gray-400 ml-3">Save</label>
+              <input type="checkbox" checked={saveHistory} onChange={(e)=>setSaveHistory(e.target.checked)} />
+              <button onClick={()=>{ navigator.clipboard.writeText(query); show('Copied query', { type: 'success' }); }} className="px-2 py-1 text-xs border border-green-500/30 rounded text-green-300 hover:bg-green-900/20">Copy</button>
             </div>
           </div>
         </div>
 
-        {/* Query Editor */}
+        {/* Tabs + Query Editor */}
         <div className="flex-1 flex flex-col">
+          {/* Tabs */}
+          <div className="bg-gray-800 px-4 py-2 border-b border-gray-700 flex items-center justify-between">
+            <div className="flex items-center gap-2 overflow-x-auto">
+              {tabs.map(t => (
+                <div key={t.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-md border ${t.id === activeTabId ? 'border-green-500/50 bg-green-900/20 text-green-300' : 'border-green-500/20 bg-gray-900/40 text-gray-300'}`}>
+                  <button onClick={() => { setActiveTabId(t.id); persistTabs(tabs, t.id); }} className="text-sm font-medium">{t.title}</button>
+                  <button onClick={() => { if(tabs.length>1){ const idx = tabs.findIndex(x=>x.id===t.id); const next = tabs.filter(x=>x.id!==t.id); const nextActive = t.id===activeTabId ? (next[Math.max(0, idx-1)]?.id || next[0].id) : activeTabId; setTabs(next); setActiveTabId(nextActive); persistTabs(next, nextActive);} }} className="text-xs text-gray-400 hover:text-red-400">✕</button>
+                </div>
+              ))}
+              <button onClick={() => { const id = `tab-${Math.random().toString(36).slice(2)}`; const next = [...tabs, { id, title: `Query ${tabs.length+1}`, query: '{}' }]; setTabs(next); setActiveTabId(id); persistTabs(next, id); }} className="px-2 py-1.5 text-sm border border-green-500/30 rounded text-green-300 hover:bg-green-900/20">+ New</button>
+            </div>
+          </div>
           <div className="bg-gray-800 px-4 py-2 border-b border-gray-700 flex items-center justify-between">
             <span className="text-sm text-gray-400">Query Editor</span>
             <div className="flex gap-2 text-xs">

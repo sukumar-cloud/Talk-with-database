@@ -325,6 +325,33 @@ export default function MongoDBSchemaWorkbench() {
           )}
         </div>
       </div>
+      {/* Floating view toggle */}
+      <div className="fixed bottom-6 right-6 z-[10001] flex gap-2">
+        <button
+          type="button"
+          onClick={() => setViewMode('list')}
+          className={`px-4 py-2 rounded-lg shadow-lg border ${
+            viewMode === 'list'
+              ? 'bg-green-600 text-white border-green-400'
+              : 'bg-gray-800/80 text-gray-200 border-green-500/30 hover:bg-gray-700'
+          }`}
+          aria-label="List view"
+        >
+          List
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode('diagram')}
+          className={`px-4 py-2 rounded-lg shadow-lg border ${
+            viewMode === 'diagram'
+              ? 'bg-green-600 text-white border-green-400'
+              : 'bg-gray-800/80 text-gray-200 border-green-500/30 hover:bg-gray-700'
+          }`}
+          aria-label="Diagram view"
+        >
+          Diagram
+        </button>
+      </div>
     </div>
   );
 }

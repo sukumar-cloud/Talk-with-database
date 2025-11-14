@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Database, Table2, Key, Link2, Search, Layout, List } from 'lucide-react';
 import { post } from '../lib/api';
 import ERDiagram from '../components/ERDiagram';
+import { useToast } from '../contexts/ToastContext';
+import { useNavigate } from 'react-router-dom';
 
 interface Column {
   name: string;
@@ -36,6 +38,8 @@ interface SchemaData {
 }
 
 export default function SchemaWorkbench() {
+  const { show } = useToast();
+  const navigate = useNavigate();
   const [schema, setSchema] = useState<SchemaData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -111,7 +115,7 @@ export default function SchemaWorkbench() {
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 relative" style={{ zIndex: 50 }}>
           <div>
             <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
               <Database className="w-8 h-8" />
@@ -123,30 +127,7 @@ export default function SchemaWorkbench() {
           </div>
           
           {/* View Mode Toggle */}
-          <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`px-4 py-2 rounded-md flex items-center gap-2 transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-white shadow text-blue-600'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              <List className="w-4 h-4" />
-              List View
-            </button>
-            <button
-              onClick={() => setViewMode('diagram')}
-              className={`px-4 py-2 rounded-md flex items-center gap-2 transition-colors ${
-                viewMode === 'diagram'
-                  ? 'bg-white shadow text-blue-600'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              <Layout className="w-4 h-4" />
-              Diagram View
-            </button>
-          </div>
+          <div></div>
         </div>
 
         {/* Search Bar */}
@@ -196,6 +177,46 @@ export default function SchemaWorkbench() {
 
                   {isSelected && (
                     <div className="p-4 space-y-4">
+                      {/* Quick Actions */}
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => {
+                            try {
+                              const ddlCols = columns.map(c => `  ${c.name} ${c.type}${(c.nullable === 'NO') ? ' NOT NULL' : ''}${c.extra ? ' ' + c.extra : ''}`).join(',\n');
+                              const pk = (schema.primary_keys[tableName] || []).length ? `,\n  PRIMARY KEY(${schema.primary_keys[tableName].join(', ')})` : '';
+                              const ddl = `CREATE TABLE ${tableName} (\n${ddlCols}${pk}\n);`;
+                              navigator.clipboard.writeText(ddl);
+                              show('DDL copied', { type: 'success' });
+                            } catch {}
+                          }}
+                          className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
+                          Copy DDL
+                        </button>
+                        <button
+                          onClick={() => {
+                            const sel = `SELECT *\nFROM ${tableName}\nLIMIT 100;`;
+                            localStorage.setItem('sqlWorkbenchQuery', sel);
+                            navigate('/sql-workbench');
+                          }}
+                          className="px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                        >
+                          Open SELECT template
+                        </button>
+                        {getRelatedTables(tableName).outgoing.length > 0 && (
+                          <button
+                            onClick={() => {
+                              const fk = getRelatedTables(tableName).outgoing[0];
+                              const join = `SELECT *\nFROM ${tableName} t\nJOIN ${fk.to_table} r ON t.${fk.from_column} = r.${fk.to_column}\nLIMIT 100;`;
+                              localStorage.setItem('sqlWorkbenchQuery', join);
+                              navigate('/sql-workbench');
+                            }}
+                            className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+                          >
+                            Open JOIN template
+                          </button>
+                        )}
+                      </div>
                       {/* Columns */}
                       <div>
                         <h4 className="font-semibold text-gray-700 mb-2">Columns</h4>
@@ -327,10 +348,26 @@ export default function SchemaWorkbench() {
           </div>
         </div>
       ) : (
-        <div className="bg-black border rounded-lg shadow-sm p-6">
+        <div className="bg-black border rounded-lg shadow-sm p-6 relative" style={{ zIndex: 1 }}>
           <ERDiagram tables={schema.tables} columns={schema.columns} foreign_keys={schema.foreign_keys} />
         </div>
       )}
+
+      {/* Floating view toggle */}
+      <div className="fixed bottom-6 right-6 z-[10001] flex gap-2">
+        <button
+          type="button"
+          onClick={() => setViewMode('diagram')}
+          className={`px-4 py-2 rounded-lg shadow-lg border ${
+            viewMode === 'diagram' 
+              ? 'bg-green-600 text-white border-green-400' 
+              : 'bg-gray-800/80 text-gray-200 border-green-500/30 hover:bg-gray-700'
+          }`}
+          aria-label="Diagram view"
+        >
+          Diagram
+        </button>
+      </div>
     </div>
   );
 }

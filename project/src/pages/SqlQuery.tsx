@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { Play, AlertTriangle } from 'lucide-react';
 import { Editor } from '@monaco-editor/react';
 import { post } from '../lib/api';
+import { useToast } from '../contexts/ToastContext';
 
 export default function SqlQuery() {
+  const { show } = useToast();
   const [input, setInput] = useState(() => {
     // Load saved query from localStorage on mount
     return localStorage.getItem('sqlQueryInput') || '';
@@ -15,6 +17,9 @@ export default function SqlQuery() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [queryWarning, setQueryWarning] = useState<string | null>(null);
+  const [variants, setVariants] = useState<Array<{ title: string; sql: string; notes?: string }>>([]);
+  const [variantCount, setVariantCount] = useState<number>(5);
+  const [saveHistory, setSaveHistory] = useState<boolean>(true);
 
   // Save query to localStorage whenever it changes
   const handleInputChange = (value: string) => {
@@ -132,7 +137,7 @@ export default function SqlQuery() {
       const executionTime = performance.now() - startTime;
       
       // Save to history
-      if (bestQuery) {
+      if (bestQuery && saveHistory) {
         try {
           await post('/history/save', {
             query_text: input,
@@ -143,11 +148,36 @@ export default function SqlQuery() {
             error_message: errorMessage || null,
             execution_time_ms: Math.round(executionTime)
           });
+          show('Saved to history', { type: 'success' });
         } catch (historyError) {
           console.error('Failed to save to history:', historyError);
         }
       }
     }
+  };
+
+  const generateVariants = async () => {
+    try {
+      setVariants([]);
+      setLoading(true);
+      const resp = await fetch('http://localhost:8000/generate/sql/generate-multiple', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: input, database: 'mysql', count: variantCount })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.detail || 'Failed to generate variants');
+      setVariants(data.variants || []);
+      show(`Generated ${data.variants?.length || 0} variants`, { type: 'success' });
+    } catch (e: any) {
+      show(e?.message || 'Failed to generate variants', { type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try { await navigator.clipboard.writeText(text); show('Copied', { type: 'success' }); } catch {}
   };
 
   return (
@@ -167,18 +197,52 @@ export default function SqlQuery() {
               focus:outline-none focus:ring-2 focus:ring-[#00ff00]/50 text-white
               placeholder:text-gray-500 transition-all duration-300 hover:border-[#00ff00]/50"
           />
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="mt-4 w-full bg-[#00ff00]/10 text-[#00ff00] py-3 px-4 rounded-md 
-              hover:bg-[#00ff00]/20 transition-all duration-300 hover-glow
-              flex items-center justify-center space-x-2 border border-[#00ff00]/30
-              disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Play className="h-5 w-5" />
-            <span>{loading ? 'Processing...' : 'Generate SQL'}</span>
-          </button>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-gray-400">Variants</label>
+              <select value={variantCount} onChange={(e)=>setVariantCount(Number(e.target.value))} className="bg-black/50 border border-[#00ff00]/30 rounded-md px-3 py-2 text-sm">
+                <option value={3}>3</option>
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+              </select>
+              <button onClick={generateVariants} disabled={loading} className="ml-2 px-4 py-2 text-sm bg-[#00ff00]/10 text-[#00ff00] border border-[#00ff00]/30 rounded hover:bg-[#00ff00]/20 disabled:opacity-50">Generate Variants</button>
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <label className="text-sm text-gray-400">Save to History</label>
+              <input type="checkbox" checked={saveHistory} onChange={(e)=>setSaveHistory(e.target.checked)} />
+              <button
+                onClick={handleSubmit}
+                disabled={loading}
+                className="px-4 py-2 bg-[#00ff00]/10 text-[#00ff00] rounded border border-[#00ff00]/30 hover:bg-[#00ff00]/20 disabled:opacity-50 flex items-center gap-2"
+              >
+                <Play className="h-4 w-4" />
+                <span>{loading ? 'Processing...' : 'Generate + Run'}</span>
+              </button>
+            </div>
+          </div>
         </div>
+
+        {variants.length > 0 && (
+          <div className="border border-[#00ff00]/30 rounded-lg p-4 bg-black/30">
+            <h3 className="text-[#00ff00] font-semibold mb-3">Variants</h3>
+            <div className="space-y-3">
+              {variants.map((v, idx) => (
+                <div key={idx} className="border border-[#00ff00]/20 rounded p-3 bg-black/40">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm text-gray-300 font-semibold">{v.title || `Variant ${idx+1}`}</div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={()=>copyToClipboard(v.sql)} className="text-xs px-2 py-1 border border-[#00ff00]/30 rounded text-[#00ff00] bg-[#00ff00]/10 hover:bg-[#00ff00]/20">Copy</button>
+                      <button onClick={()=>{handleGeneratedQueryChange(v.sql); show('Inserted into editor', { type:'success' });}} className="text-xs px-2 py-1 border border-[#00ff00]/30 rounded text-[#00ff00] bg-[#00ff00]/10 hover:bg-[#00ff00]/20">Insert</button>
+                      <button onClick={async()=>{handleGeneratedQueryChange(v.sql); await new Promise(r=>setTimeout(r,50)); handleSubmit();}} className="text-xs px-2 py-1 border border-[#00ff00]/30 rounded text-[#00ff00] bg-[#00ff00]/10 hover:bg-[#00ff00]/20">Run</button>
+                    </div>
+                  </div>
+                  <pre className="text-xs text-gray-300 whitespace-pre-wrap">{v.sql}</pre>
+                  {v.notes && <div className="text-[11px] text-gray-500 mt-1">{v.notes}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {queryWarning && (
           <div className="border border-red-500/50 rounded-lg bg-red-900/20 p-5 animate-pulse">

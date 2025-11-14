@@ -69,7 +69,8 @@ export default function Sidebar() {
     { icon: History, label: 'History', path: '/history' },
     { icon: MessageSquare, label: 'Chatbot', path: '/chatbot' },
     { icon: FileText, label: 'Documentation', path: '/docs' },
-    { icon: Settings, label: 'Settings', path: '/settings' }
+    { icon: Settings, label: 'Settings', path: '/settings' },
+    { icon: Home, label: 'Login', path: '/login' }
   ];
 
 

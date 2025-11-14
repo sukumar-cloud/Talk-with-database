@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Play, Database, Table2, ChevronRight, ChevronDown, Loader2 } from 'lucide-react';
 import { post } from '../lib/api';
+import { useToast } from '../contexts/ToastContext';
+import DeerLoader from '../components/DeerLoader';
 
 interface Column {
   name: string;
@@ -18,21 +20,59 @@ interface SchemaData {
 }
 
 export default function SqlWorkbench() {
+  const { show } = useToast();
   const [schema, setSchema] = useState<SchemaData | null>(null);
-  const [query, setQuery] = useState(() => {
-    // Load saved query from localStorage on mount
-    return localStorage.getItem('sqlWorkbenchQuery') || 'SELECT * FROM customers LIMIT 10;';
+  // Tabs state
+  const [tabs, setTabs] = useState<Array<{ id: string; title: string; query: string }>>(() => {
+    const saved = localStorage.getItem('sqlWorkbenchTabs');
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    return [{ id: 'tab-1', title: 'Query 1', query: localStorage.getItem('sqlWorkbenchQuery') || 'SELECT * FROM customers LIMIT 10;' }];
   });
+  const [activeTabId, setActiveTabId] = useState<string>(() => (JSON.parse(localStorage.getItem('sqlWorkbenchActive') || 'null') || 'tab-1'));
+  const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
+  const query = activeTab?.query || '';
   const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [error, setError] = useState('');
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
+  const [saveHistory, setSaveHistory] = useState<boolean>(true);
 
-  // Save query to localStorage whenever it changes
+  // Persist tabs
+  const persistTabs = (next: typeof tabs, nextActive?: string) => {
+    localStorage.setItem('sqlWorkbenchTabs', JSON.stringify(next));
+    if (nextActive) localStorage.setItem('sqlWorkbenchActive', JSON.stringify(nextActive));
+  };
+
+  // Save query in active tab
   const handleQueryChange = (value: string) => {
-    setQuery(value);
+    setTabs((prev: Array<{ id: string; title: string; query: string }>) => {
+      const next = prev.map(t => t.id === activeTabId ? { ...t, query: value } : t);
+      persistTabs(next);
+      return next;
+    });
     localStorage.setItem('sqlWorkbenchQuery', value);
+  };
+
+  const addTab = () => {
+    const id = `tab-${Math.random().toString(36).slice(2)}`;
+    const newTab = { id, title: `Query ${tabs.length + 1}`, query: 'SELECT * FROM customers LIMIT 10;' };
+    const next = [...tabs, newTab];
+    setTabs(next);
+    setActiveTabId(id);
+    persistTabs(next, id);
+  };
+
+  const closeTab = (id: string) => {
+    if (tabs.length === 1) return;
+    const idx = tabs.findIndex(t => t.id === id);
+    const next = tabs.filter(t => t.id !== id);
+    const nextActive = id === activeTabId ? (next[Math.max(0, idx - 1)]?.id || next[0].id) : activeTabId;
+    setTabs(next);
+    setActiveTabId(nextActive);
+    persistTabs(next, nextActive);
   };
 
   useEffect(() => {
@@ -68,11 +108,13 @@ export default function SqlWorkbench() {
   };
 
   const insertTableName = (tableName: string) => {
-    setQuery(prev => prev + ` ${tableName}`);
+    const next = `${query} ${tableName}`.trim();
+    handleQueryChange(next);
   };
 
   const insertColumnName = (tableName: string, columnName: string) => {
-    setQuery(prev => prev + ` ${tableName}.${columnName}`);
+    const next = `${query} ${tableName}.${columnName}`.trim();
+    handleQueryChange(next);
   };
 
   const isDangerousQuery = (sql: string): { dangerous: boolean; reason: string } => {
@@ -149,18 +191,21 @@ export default function SqlWorkbench() {
       const executionTime = performance.now() - startTime;
       
       // Save to history
-      try {
-        await post('/history/save', {
-          query_text: `Direct SQL: ${query.trim().substring(0, 100)}...`,
-          generated_sql: query.trim(),
-          query_type: 'mysql',
-          status: querySuccess ? 'success' : 'error',
-          result_count: resultCount,
-          error_message: errorMessage || null,
-          execution_time_ms: Math.round(executionTime)
-        });
-      } catch (historyError) {
-        console.error('Failed to save to history:', historyError);
+      if (saveHistory) {
+        try {
+          await post('/history/save', {
+            query_text: `Direct SQL: ${query.trim().substring(0, 100)}...`,
+            generated_sql: query.trim(),
+            query_type: 'mysql',
+            status: querySuccess ? 'success' : 'error',
+            result_count: resultCount,
+            error_message: errorMessage || null,
+            execution_time_ms: Math.round(executionTime)
+          });
+          show('Saved to history', { type: 'success' });
+        } catch (historyError) {
+          console.error('Failed to save to history:', historyError);
+        }
       }
     }
   };
@@ -189,7 +234,7 @@ export default function SqlWorkbench() {
         <div className="flex-1 overflow-y-auto">
           {schemaLoading ? (
             <div className="flex items-center justify-center p-8">
-              <Loader2 className="w-6 h-6 animate-spin text-green-500" />
+              <div className="w-full h-36"><DeerLoader label="Loading schema..." /></div>
             </div>
           ) : (
             <div className="p-2">
@@ -256,8 +301,25 @@ export default function SqlWorkbench() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
-        {/* Query Editor */}
+        {/* Tabs + Query Editor */}
         <div className="bg-gray-800 border-b border-green-500/30 p-4">
+          {/* Tabs bar */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 overflow-x-auto">
+              {tabs.map(t => (
+                <div key={t.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-md border ${t.id === activeTabId ? 'border-green-500/50 bg-green-900/20 text-green-300' : 'border-green-500/20 bg-gray-900/40 text-gray-300'}`}>
+                  <button onClick={() => { setActiveTabId(t.id); persistTabs(tabs, t.id); }} className="text-sm font-medium">{t.title}</button>
+                  <button onClick={() => closeTab(t.id)} className="text-xs text-gray-400 hover:text-red-400">✕</button>
+                </div>
+              ))}
+              <button onClick={addTab} className="px-2 py-1.5 text-sm border border-green-500/30 rounded text-green-300 hover:bg-green-900/20">+ New</button>
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="text-xs text-gray-400">Save to History</label>
+              <input type="checkbox" checked={saveHistory} onChange={e=>setSaveHistory(e.target.checked)} />
+              <button onClick={() => { navigator.clipboard.writeText(query); show('Copied query', { type: 'success' }); }} className="px-3 py-1.5 text-xs border border-green-500/30 rounded text-green-300 hover:bg-green-900/20">Copy</button>
+            </div>
+          </div>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
               <h3 className="text-sm font-semibold text-green-400">Query Editor</h3>
