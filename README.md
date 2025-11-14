@@ -1,3 +1,146 @@
+<div align="center">
+  <h1>🗣️ Talk with Database</h1>
+  <p>An intelligent AI assistant that lets you interact with your databases using natural language</p>
+  
+  [![Status](https://img.shields.io/badge/status-active-success.svg?style=for-the-badge)]()
+  [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)](/LICENSE)
+  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=for-the-badge)](CONTRIBUTING.md)
+  
+  [![Backend](https://img.shields.io/badge/FastAPI-009485?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+  [![Frontend](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+  [![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+  [![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
+
+  [![GitHub stars](https://img.shields.io/github/stars/sukumar-cloud/Talk-with-database?style=social)](https://github.com/sukumar-cloud/Talk-with-database/stargazers)
+  [![GitHub forks](https://img.shields.io/github/forks/sukumar-cloud/Talk-with-database?style=social)](https://github.com/sukumar-cloud/Talk-with-database/network/members)
+  [![GitHub issues](https://img.shields.io/github/issues/sukumar-cloud/Talk-with-database)](https://github.com/sukumar-cloud/Talk-with-database/issues)
+</div>
+
+## ✨ Features
+
+<div align="center">
+  <img src="https://img.icons8.com/color/96/000000/database-export.png" alt="Database Query" width="48"/>
+  <img src="https://img.icons8.com/color/96/000000/chatbot.png" alt="AI Chat" width="48"/>
+  <img src="https://img.icons8.com/color/96/000000/visualization-skill.png" alt="Visualization" width="48"/>
+  <img src="https://img.icons8.com/color/96/000000/security-checked.png" alt="Security" width="48"/>
+</div>
+
+- **Natural Language to SQL** - Convert plain English to optimized SQL queries
+- **Multi-Database Support** - Works with both SQL and NoSQL databases
+- **Interactive Schema Visualization** - Visual ER diagrams and schema exploration
+- **AI-Powered Chat** - Get database insights through natural conversation
+- **Query Validation** - Safe execution with built-in validation
+- **Modern UI** - Sleek, responsive interface with dark/light themes
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 18+ & npm/yarn
+- Python 3.10+
+- MySQL 8.0+ (for SQL features)
+- MongoDB (optional, for NoSQL features)
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/sukumar-cloud/Talk-with-database.git
+   cd Talk-with-database
+   ```
+
+2. **Set up backend**
+   ```bash
+   cd backend
+   python -m venv .venv
+   .venv\Scripts\activate  # Windows
+   # source .venv/bin/activate  # Linux/Mac
+   pip install -r requirements.txt
+   ```
+
+3. **Configure environment**
+   Create `.env` file in the `backend` directory:
+   ```env
+   DB_TYPE=mysql
+   DB_URI=mysql+pymysql://user:password@localhost:3306/your_database
+   MONGODB_URI=mongodb://localhost:27017/  # Optional
+   ```
+
+4. **Set up frontend**
+   ```bash
+   cd ../project
+   npm install
+   ```
+
+5. **Run the application**
+   - Backend: `uvicorn fastapi_app.main:app --reload`
+   - Frontend: `npm run dev`
+
+   Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+## 🖥️ Screenshots
+
+| Feature | Preview |
+|---------|---------|
+| **Chat Interface** | ![Chat Interface](https://via.placeholder.com/600x400/2d3748/ffffff?text=Chat+Interface) |
+| **Schema Visualization** | ![Schema Visualization](https://via.placeholder.com/600x400/2d3748/ffffff?text=Schema+Visualization) |
+| **Query Workbench** | ![Query Workbench](https://via.placeholder.com/600x400/2d3748/ffffff?text=Query+Workbench) |
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **Framework**: React 18 + TypeScript
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS
+- **State Management**: Redux Toolkit
+- **UI Components**: Headless UI, Lucide Icons
+- **Visualization**: React Flow, D3.js
+
+### Backend
+- **Framework**: FastAPI (Python)
+- **Database**: MySQL, MongoDB
+- **ORM**: SQLAlchemy, PyMongo
+- **AI/ML**: Transformers, spaCy
+- **API Docs**: Swagger UI, ReDoc
+
+## 📚 Documentation
+
+For detailed documentation, please visit our [Wiki](https://github.com/sukumar-cloud/Talk-with-database/wiki).
+
+### API Reference
+
+Explore the interactive API documentation:
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+
+## 🤝 Contributing
+
+We welcome contributions! Please read our [Contributing Guidelines](CONTRIBUTING.md) to get started.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [FastAPI](https://fastapi.tiangolo.com/) for the amazing backend framework
+- [React](https://reactjs.org/) for the frontend library
+- [Tailwind CSS](https://tailwindcss.com/) for the utility-first CSS framework
+- All the amazing open-source libraries and tools we depend on
+
+---
+
+<div align="center">
+  Made with ❤️ by [Your Name] | [![Twitter](https://img.icons8.com/color/24/000000/twitter--v1.png)](https://twitter.com/yourhandle) [![LinkedIn](https://img.icons8.com/color/24/000000/linkedin.png)](https://linkedin.com/in/yourprofile)
+</div>
+
 # Talk-with-database
 An AI-powered assistant to talk to your databases using natural language. It supports intent understanding, SQL generation, validation, ranking, and execution. A modern React UI provides a chat experience and database workbenches.
 
