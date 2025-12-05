@@ -176,16 +176,23 @@ const MongoDBWorkbench: React.FC = () => {
     try {
       const parsedQuery = JSON.parse(query);
       
+      // Create the request body
+      const requestBody: any = {
+        db_name: selectedDatabase,
+        collection_name: selectedCollection,
+        query: parsedQuery,
+        operation: operation
+      };
+
+      // Only include document for insert/update operations
+      if (['insert', 'update'].includes(operation)) {
+        requestBody.document = parsedQuery;
+      }
+
       const response = await fetch('http://localhost:8000/mongodb/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          db_name: selectedDatabase,
-          collection_name: selectedCollection,
-          query: parsedQuery,
-          operation: operation,
-          document: ['insert', 'update'].includes(operation) ? parsedQuery : null
-        })
+        body: JSON.stringify(requestBody)
       });
 
       const data = await response.json();

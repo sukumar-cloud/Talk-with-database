@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Play, AlertTriangle, Zap } from 'lucide-react';
-import { Editor } from '@monaco-editor/react';
+import Editor from '@monaco-editor/react';
 import { post } from '../lib/api';
 import { useToast } from '../contexts/ToastContext';
 
@@ -31,6 +31,7 @@ export default function MongoDbQuery() {
   const [variants, setVariants] = useState<Array<{ title: string; mongo: any; notes?: string }>>([]);
   const [variantCount, setVariantCount] = useState<number>(5);
   const [saveHistory, setSaveHistory] = useState<boolean>(true);
+  const [inferredDb, setInferredDb] = useState<string>('test');
 
   // Save input to localStorage
   const handleInputChange = (value: string) => {
@@ -81,6 +82,10 @@ export default function MongoDbQuery() {
       const schema = await post<{ db_type: string }, any>('/mongodb/inspect', {
         db_type: 'mongodb'
       });
+      try {
+        const dbs = schema?.collections ? Object.keys(schema.collections) : (schema && typeof schema === 'object' ? Object.keys(schema) : []);
+        if (dbs && dbs.length > 0) setInferredDb(dbs[0]);
+      } catch {}
 
       // 2) Generate MongoDB query candidates
       const genResult = await post<any, any>('/mongodb/generate', {
@@ -162,56 +167,62 @@ export default function MongoDbQuery() {
   };
 
   const handleExecute = async () => {
-    if (!generatedQuery) return;
-
     setExecuting(true);
     setError(null);
     setResults(null);
 
     try {
-      // Parse the MongoDB query
-      const match = generatedQuery.match(/db\.(\w+)\.(find|findOne|insertOne|updateOne|deleteOne|aggregate)\((.*)\)/s);
-      
-      if (!match) {
-        throw new Error('Could not parse MongoDB query format');
-      }
+      if (!generatedQuery) throw new Error('No generated query to execute');
 
-      const collection = match[1];
-      const operation = match[2];
-      let queryObj = {};
+      // Match forms like: db.collection.find(...)
+      const m = generatedQuery.match(/db\.(\w+)\.(find|findOne|insertOne|updateOne|deleteOne|aggregate|count|countDocuments)\(([\s\S]*)\)/);
+      if (!m) throw new Error('Could not parse generated MongoDB query');
 
+      const collection = m[1];
+      const opRaw = m[2];
+      const argsStr = (m[3] || '').trim();
+
+      // Extract the first JSON object from args (supports two-arg find(filter, projection))
+      let filterObj: any = {};
       try {
-        // Try to parse the query parameter
-        const queryStr = match[3].trim();
-        if (queryStr && queryStr !== '') {
-          queryObj = JSON.parse(queryStr);
+        const firstBrace = argsStr.indexOf('{');
+        if (firstBrace >= 0) {
+          let depth = 0; let i = firstBrace;
+          for (; i < argsStr.length; i++) {
+            const ch = argsStr[i];
+            if (ch === '{') depth++;
+            else if (ch === '}') { depth--; if (depth === 0) { i++; break; } }
+          }
+          const jsonSlice = argsStr.slice(firstBrace, i);
+          filterObj = jsonSlice ? JSON.parse(jsonSlice) : {};
         }
-      } catch (parseError) {
-        throw new Error('Invalid query format. Please ensure valid JSON.');
+      } catch {
+        // fallback: try direct JSON parse
+        try { filterObj = JSON.parse(argsStr); } catch { filterObj = {}; }
       }
 
-      // Execute the query
+      const opMap: Record<string, string> = {
+        findOne: 'find', insertOne: 'insert', updateOne: 'update', deleteOne: 'delete', aggregate: 'find', countDocuments: 'count'
+      };
+      const operation = (opMap[opRaw] || opRaw) as 'find' | 'insert' | 'update' | 'delete' | 'count';
+
+      const dbName = localStorage.getItem('mongoDefaultDb') || inferredDb || 'test';
+      const body: any = { db_name: dbName, collection_name: collection, query: filterObj, operation };
+      if (operation === 'insert' || operation === 'update') body.document = filterObj;
+
       const response = await fetch('http://localhost:8000/mongodb/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          db_name: 'mydb',
-          collection_name: collection,
-          query: queryObj,
-          operation: operation === 'findOne' ? 'find' : operation,
-          document: ['insertOne', 'updateOne'].includes(operation) ? queryObj : null
-        })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       });
 
       const data = await response.json();
-
-      if (response.ok) {
-        setResults(data);
-      } else {
-        setError(data.detail || 'Failed to execute query');
+      if (response.ok) setResults(data);
+      else {
+        const detail = data?.detail ?? data; const msg = typeof detail === 'string' ? detail : JSON.stringify(detail);
+        setError(msg || 'Failed to execute query');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to execute query');
+      const msg = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
+      setError(msg || 'Failed to execute query');
     } finally {
       setExecuting(false);
     }
@@ -229,11 +240,10 @@ export default function MongoDbQuery() {
           <textarea
             value={input}
             onChange={(e) => handleInputChange(e.target.value)}
-            placeholder="Describe your query in natural language...&#10;Examples:&#10;• Find all active users&#10;• Get products with price greater than 100&#10;• Show orders from last month"
-            className="w-full h-32 bg-black/50 border border-[#00ff00]/30 rounded-md px-4 py-2
-              focus:outline-none focus:ring-2 focus:ring-[#00ff00]/50 text-white
-              placeholder:text-gray-500 transition-all duration-300 hover:border-[#00ff00]/50"
+            placeholder="Describe your query in natural language...\nExamples:\n• Find all active users\n• Get products with price greater than 100\n• Show orders from last month"
+            className="w-full h-32 bg-black/50 border border-[#00ff00]/30 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#00ff00]/50 text-white placeholder:text-gray-500 transition-all duration-300 hover:border-[#00ff00]/50"
           />
+
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="flex items-center gap-3">
               <label className="text-sm text-gray-400">Variants</label>
@@ -257,6 +267,7 @@ export default function MongoDbQuery() {
               </button>
             </div>
           </div>
+        </div>
         </div>
 
         {variants.length > 0 && (
@@ -332,6 +343,8 @@ export default function MongoDbQuery() {
           </div>
         )}
 
+        {/* JSON panel removed: execution now relies directly on generatedQuery parsing */}
+
         {results && (
           <div className="border border-[#00ff00]/30 rounded-lg overflow-hidden bg-black/30">
             <div className="bg-black/50 px-4 py-3 border-b border-[#00ff00]/30">
@@ -372,6 +385,5 @@ export default function MongoDbQuery() {
           </div>
         )}
       </div>
-    </div>
   );
 }

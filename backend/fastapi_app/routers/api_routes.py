@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import os
+import re
 from ..core.generator import get_generator
 
 router = APIRouter()
@@ -100,10 +101,26 @@ def build_graphql_prompt(text: str, schema: Optional[Dict[str, Any]]) -> str:
 @router.post("/generate")
 def generate(req: ApiGenerateRequest):
     provider = os.getenv("GENERATOR_PROVIDER", "mixtral")
-    n = req.n_candidates or int(os.getenv("GENERATOR_N_CANDIDATES", "3"))
-    temperature = req.temperature or float(os.getenv("GENERATOR_TEMPERATURE", "0.2"))
-    top_p = req.top_p or float(os.getenv("GENERATOR_TOP_P", "0.95"))
-    max_tokens = req.max_tokens or int(os.getenv("GENERATOR_MAX_TOKENS", "200"))
+    # Safe parsers
+    def safe_int(val: str, default: int) -> int:
+        try:
+            return int(val)
+        except Exception:
+            m = re.search(r"\d+", str(val) or "")
+            return int(m.group(0)) if m else default
+
+    def safe_float(val: str, default: float) -> float:
+        try:
+            return float(val)
+        except Exception:
+            m = re.search(r"\d+(?:\.\d+)?", str(val) or "")
+            return float(m.group(0)) if m else default
+
+    n = req.n_candidates or safe_int(os.getenv("GENERATOR_N_CANDIDATES", "3"), 3)
+    temperature = req.temperature or safe_float(os.getenv("GENERATOR_TEMPERATURE", "0.2"), 0.2)
+    top_p = req.top_p or safe_float(os.getenv("GENERATOR_TOP_P", "0.95"), 0.95)
+    max_tokens = req.max_tokens or safe_int(os.getenv("GENERATOR_MAX_TOKENS", "200"), 200)
+
     mode = req.mode.lower()
     gen = None
     try:

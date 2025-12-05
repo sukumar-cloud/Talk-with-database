@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Literal
 import os
 from sqlalchemy import create_engine, text
 from pymongo import MongoClient
@@ -26,9 +26,12 @@ class DatabaseRequest(BaseModel):
 class MongoQueryRequest(BaseModel):
     db_name: str
     collection_name: str
-    query: Dict[str, Any] = {}
-    operation: str = "find"  # find, insert, update, delete
-    document: Optional[Dict[str, Any]] = None
+    query: Any = {}
+    operation: Literal["find","insert","update","delete","count"] = "find"
+    document: Optional[Any] = None
+
+    # Allow extra fields without failing validation
+    model_config = {"extra": "ignore"}
 
 class MongoNLURequest(BaseModel):
     text: str
@@ -389,14 +392,53 @@ def mongodb_execute_query(req: MongoQueryRequest):
     if not mongo_uri:
         raise HTTPException(status_code=400, detail="MONGO_URI not set")
     
-    # Validate query first
-    validation_result = validate_mongodb_query(req.query, req.operation)
-    if validation_result["blocked"]:
+    # Basic request validation
+    if not req.db_name or not req.collection_name:
         raise HTTPException(
-            status_code=403,
+            status_code=422,
             detail={
-                "error": "Query blocked by safety validation",
-                "reasons": validation_result["reasons"]
+                "error": "Validation error",
+                "details": ["db_name and collection_name are required"]
+            }
+        )
+    
+    # Ensure query is a dictionary
+    if not isinstance(req.query, dict):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "Validation error",
+                "details": ["query must be a valid JSON object"]
+            }
+        )
+    
+    # For insert/update operations, validate document
+    if req.operation in ["insert", "update"] and not req.document:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "Validation error",
+                "details": ["document is required for insert/update operations"]
+            }
+        )
+    
+    # Validate query first
+    try:
+        validation_result = validate_mongodb_query(req.query, req.operation)
+        if validation_result.get("blocked", False):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "Query blocked by safety validation",
+                    "reasons": validation_result.get("reasons", ["Unknown validation error"])
+                }
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "Query validation failed",
+                "details": [str(e)]
             }
         )
     
