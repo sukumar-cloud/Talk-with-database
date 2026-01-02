@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🗣️ Talk with Database</h1>
+  <h1>🗣️ Congnit Sphere</h1>
   <p>An intelligent AI assistant that lets you interact with your databases using natural language</p>
   
   [![Status](https://img.shields.io/badge/status-active-success.svg?style=for-the-badge)]()
