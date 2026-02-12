@@ -4,11 +4,28 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 import json
 import os
+from pymongo import MongoClient
 
 router = APIRouter()
 
 # Simple file-based storage for history (can be replaced with database later)
 HISTORY_FILE = "query_history.json"
+HISTORY_DB = os.getenv("HISTORY_DB", "talk_with_database")
+HISTORY_COLLECTION = os.getenv("HISTORY_COLLECTION", "query_history")
+
+
+def _get_mongo_uri() -> Optional[str]:
+    return os.getenv("HISTORY_MONGO_URI") or os.getenv("MONGO_URI")
+
+
+def _get_history_collection():
+    mongo_uri = _get_mongo_uri()
+    if not mongo_uri:
+        return None
+    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+    client.admin.command("ping")
+    db = client[HISTORY_DB]
+    return client, db[HISTORY_COLLECTION]
 
 class QueryHistoryItem(BaseModel):
     id: str
@@ -32,6 +49,20 @@ class SaveQueryRequest(BaseModel):
 
 def load_history() -> List[Dict[str, Any]]:
     """Load query history from file"""
+    mongo = None
+    try:
+        mongo = _get_history_collection()
+        if mongo:
+            client, collection = mongo
+            docs = list(collection.find({}, {"_id": 0}).sort("created_at", -1).limit(1000))
+            return docs
+    except Exception as e:
+        print(f"Error loading history from MongoDB: {e}")
+    finally:
+        if mongo:
+            client, _ = mongo
+            client.close()
+
     if not os.path.exists(HISTORY_FILE):
         return []
     try:
@@ -43,6 +74,22 @@ def load_history() -> List[Dict[str, Any]]:
 
 def save_history(history: List[Dict[str, Any]]):
     """Save query history to file"""
+    mongo = None
+    try:
+        mongo = _get_history_collection()
+        if mongo:
+            client, collection = mongo
+            collection.delete_many({})
+            if history:
+                collection.insert_many(history)
+            return
+    except Exception as e:
+        print(f"Error saving history to MongoDB: {e}")
+    finally:
+        if mongo:
+            client, _ = mongo
+            client.close()
+
     try:
         with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
             json.dump(history, f, indent=2, ensure_ascii=False)
@@ -54,18 +101,42 @@ def save_history(history: List[Dict[str, Any]]):
 def get_history(limit: int = 50, offset: int = 0):
     """Get query history with pagination"""
     try:
+        mongo = None
+        try:
+            mongo = _get_history_collection()
+            if mongo:
+                client, collection = mongo
+                total = collection.count_documents({})
+                items = list(
+                    collection.find({}, {"_id": 0})
+                    .sort("created_at", -1)
+                    .skip(offset)
+                    .limit(limit)
+                )
+                return {
+                    "total": total,
+                    "limit": limit,
+                    "offset": offset,
+                    "items": items,
+                    "store": "mongodb",
+                }
+        except Exception as e:
+            print(f"Error listing history from MongoDB: {e}")
+        finally:
+            if mongo:
+                client, _ = mongo
+                client.close()
+
         history = load_history()
-        # Sort by created_at descending (most recent first)
         history.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-        
         total = len(history)
         paginated = history[offset:offset + limit]
-        
         return {
             "total": total,
             "limit": limit,
             "offset": offset,
-            "items": paginated
+            "items": paginated,
+            "store": "file",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -74,13 +145,8 @@ def get_history(limit: int = 50, offset: int = 0):
 def save_query(req: SaveQueryRequest):
     """Save a query to history"""
     try:
-        history = load_history()
-        
-        # Generate unique ID
         import uuid
         new_id = str(uuid.uuid4())
-        
-        # Create new history item
         new_item = {
             "id": new_id,
             "query_text": req.query_text,
@@ -92,20 +158,43 @@ def save_query(req: SaveQueryRequest):
             "execution_time_ms": req.execution_time_ms,
             "created_at": datetime.utcnow().isoformat()
         }
-        
-        # Add to history
+
+        mongo = None
+        try:
+            mongo = _get_history_collection()
+            if mongo:
+                client, collection = mongo
+                collection.insert_one(new_item)
+                # Keep only last 1000 items
+                total = collection.count_documents({})
+                if total > 1000:
+                    overflow = total - 1000
+                    old_ids = [d["id"] for d in collection.find({}, {"id": 1, "_id": 0}).sort("created_at", 1).limit(overflow)]
+                    if old_ids:
+                        collection.delete_many({"id": {"$in": old_ids}})
+                return {
+                    "success": True,
+                    "id": new_id,
+                    "message": "Query saved to history",
+                    "store": "mongodb",
+                }
+        except Exception as e:
+            print(f"Error saving history to MongoDB: {e}")
+        finally:
+            if mongo:
+                client, _ = mongo
+                client.close()
+
+        history = load_history()
         history.append(new_item)
-        
-        # Keep only last 1000 items to prevent file from growing too large
         if len(history) > 1000:
             history = history[-1000:]
-        
         save_history(history)
-        
         return {
             "success": True,
             "id": new_id,
-            "message": "Query saved to history"
+            "message": "Query saved to history",
+            "store": "file",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -114,20 +203,30 @@ def save_query(req: SaveQueryRequest):
 def delete_query(query_id: str):
     """Delete a query from history"""
     try:
+        mongo = None
+        try:
+            mongo = _get_history_collection()
+            if mongo:
+                client, collection = mongo
+                result = collection.delete_one({"id": query_id})
+                if result.deleted_count == 0:
+                    raise HTTPException(status_code=404, detail="Query not found")
+                return {"success": True, "message": "Query deleted from history", "store": "mongodb"}
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"Error deleting history from MongoDB: {e}")
+        finally:
+            if mongo:
+                client, _ = mongo
+                client.close()
+
         history = load_history()
-        
-        # Filter out the query with matching id
         new_history = [item for item in history if item.get('id') != query_id]
-        
         if len(new_history) == len(history):
             raise HTTPException(status_code=404, detail="Query not found")
-        
         save_history(new_history)
-        
-        return {
-            "success": True,
-            "message": "Query deleted from history"
-        }
+        return {"success": True, "message": "Query deleted from history", "store": "file"}
     except HTTPException:
         raise
     except Exception as e:
@@ -137,11 +236,22 @@ def delete_query(query_id: str):
 def clear_history():
     """Clear all query history"""
     try:
+        mongo = None
+        try:
+            mongo = _get_history_collection()
+            if mongo:
+                client, collection = mongo
+                collection.delete_many({})
+                return {"success": True, "message": "History cleared", "store": "mongodb"}
+        except Exception as e:
+            print(f"Error clearing history in MongoDB: {e}")
+        finally:
+            if mongo:
+                client, _ = mongo
+                client.close()
+
         save_history([])
-        return {
-            "success": True,
-            "message": "History cleared"
-        }
+        return {"success": True, "message": "History cleared", "store": "file"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -149,27 +259,54 @@ def clear_history():
 def get_stats():
     """Get query history statistics"""
     try:
+        mongo = None
+        try:
+            mongo = _get_history_collection()
+            if mongo:
+                client, collection = mongo
+                total_queries = collection.count_documents({})
+                success_count = collection.count_documents({"status": "success"})
+                error_count = collection.count_documents({"status": "error"})
+                mysql_count = collection.count_documents({"query_type": "mysql"})
+                mongodb_count = collection.count_documents({"query_type": "mongodb"})
+                pipeline = [
+                    {"$match": {"execution_time_ms": {"$ne": None}}},
+                    {"$group": {"_id": None, "avg": {"$avg": "$execution_time_ms"}}}
+                ]
+                avg_result = list(collection.aggregate(pipeline))
+                avg_execution_time = (avg_result[0]["avg"] if avg_result else 0) or 0
+                return {
+                    "total_queries": total_queries,
+                    "success_count": success_count,
+                    "error_count": error_count,
+                    "mysql_count": mysql_count,
+                    "mongodb_count": mongodb_count,
+                    "avg_execution_time_ms": round(float(avg_execution_time), 2),
+                    "store": "mongodb",
+                }
+        except Exception as e:
+            print(f"Error getting stats from MongoDB: {e}")
+        finally:
+            if mongo:
+                client, _ = mongo
+                client.close()
+
         history = load_history()
-        
         total_queries = len(history)
         success_count = len([h for h in history if h.get('status') == 'success'])
         error_count = len([h for h in history if h.get('status') == 'error'])
-        
-        # Get query types breakdown
         mysql_count = len([h for h in history if h.get('query_type') == 'mysql'])
         mongodb_count = len([h for h in history if h.get('query_type') == 'mongodb'])
-        
-        # Calculate average execution time
         execution_times = [h.get('execution_time_ms', 0) for h in history if h.get('execution_time_ms')]
         avg_execution_time = sum(execution_times) / len(execution_times) if execution_times else 0
-        
         return {
             "total_queries": total_queries,
             "success_count": success_count,
             "error_count": error_count,
             "mysql_count": mysql_count,
             "mongodb_count": mongodb_count,
-            "avg_execution_time_ms": round(avg_execution_time, 2)
+            "avg_execution_time_ms": round(avg_execution_time, 2),
+            "store": "file",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
